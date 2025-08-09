@@ -1,11 +1,18 @@
 
 // ---------------------------------------------------------------------------------
-// 256(+64) bits integer CUDA libray for SECPK1
+// 256(+64) bits integer CUDA libray for SECPK1 - T4 Optimized
 // ---------------------------------------------------------------------------------
 
 // We need 1 extra block for ModInv
 #define NBBLOCK 5
 #define BIFULLSIZE 40
+
+// T4-specific optimizations
+#ifdef T4_OPTIMIZED
+#define T4_CACHE_LINE 128
+#define T4_WARP_SIZE 32
+#define T4_SM_COUNT 40
+#endif
 
 // Assembly directives
 #define UADDO(c, a, b) asm volatile ("add.cc.u64 %0, %1, %2;" : "=l"(c) : "l"(a), "l"(b) : "memory" );

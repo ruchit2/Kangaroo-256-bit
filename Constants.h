@@ -2,20 +2,22 @@
 #define CONSTANTSH
 
 // Release number
-#define RELEASE "2.3"
+#define RELEASE "2.3-T4-OPTIMIZED"
 
 // Use symmetry
 //#define USE_SYMMETRY
 
-// Number of random jumps
-// Max 512 for the GPU
-#define NB_JUMP 32
+// Number of random jumps - optimized for T4
+// T4 has 40 SMs, so we use 40 jumps for better distribution
+#define NB_JUMP 40
 
-// GPU group size
+// GPU group size - optimized for T4 (40 SMs, 2560 cores)
+// T4 has 64 cores per SM, so 128 threads per group works well
 #define GPU_GRP_SIZE 128
 
-// GPU number of run per kernel call
-#define NB_RUN 64
+// GPU number of run per kernel call - optimized for T4
+// Increased for better occupancy and reduced kernel launch overhead
+#define NB_RUN 96
 
 // Kangaroo type
 #define TAME 0  // Tame kangaroo
@@ -29,5 +31,14 @@
 
 // Number of merge partition
 #define MERGE_PART 256
+
+// T4-specific optimizations
+#define T4_OPTIMIZED 1
+
+// Memory alignment for T4
+#define MEMORY_ALIGNMENT 256
+
+// Stream count for multi-GPU
+#define MAX_STREAMS 4
 
 #endif //CONSTANTSH

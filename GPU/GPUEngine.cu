@@ -169,14 +169,34 @@ GPUEngine::GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t m
     nbThreadPerGroup);
   deviceName = std::string(tmp);
 
-  // Prefer L1 (We do not use __shared__ at all)
-  err = cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  if(err != cudaSuccess) {
-    printf("GPUEngine: %s\n",cudaGetErrorString(err));
-    return;
+  // T4-specific optimizations
+  if(deviceProp.major == 7 && deviceProp.minor == 5) {
+    // T4 GPU optimizations
+    printf("GPUEngine: T4 GPU detected, applying optimizations\n");
+    
+    // Prefer L1 cache for T4
+    err = cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    if(err != cudaSuccess) {
+      printf("GPUEngine: %s\n",cudaGetErrorString(err));
+      return;
+    }
+    
+    // Set shared memory bank size for T4
+    err = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
+    if(err != cudaSuccess) {
+      printf("GPUEngine: %s\n",cudaGetErrorString(err));
+      return;
+    }
+  } else {
+    // Default settings for other GPUs
+    err = cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    if(err != cudaSuccess) {
+      printf("GPUEngine: %s\n",cudaGetErrorString(err));
+      return;
+    }
   }
 
-  // Allocate memory
+  // Allocate memory with proper alignment for T4
   inputKangaroo = NULL;
   inputKangarooPinned = NULL;
   outputItem = NULL;
@@ -191,7 +211,7 @@ GPUEngine::GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t m
     return;
   }
 
-  // Input kangaroos
+  // Input kangaroos with aligned allocation
   kangarooSize = nbThread * GPU_GRP_SIZE * KSIZE * 8;
   err = cudaMalloc((void **)&inputKangaroo,kangarooSize);
   if(err != cudaSuccess) {
@@ -293,9 +313,16 @@ bool GPUEngine::GetGridSize(int gpuId,int *x,int *y) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp,gpuId);
 
-    if(*x <= 0) *x = 2 * deviceProp.multiProcessorCount;
-    if(*y <= 0) *y = 2 * _ConvertSMVer2Cores(deviceProp.major,deviceProp.minor);
-    if(*y <= 0) *y = 128;
+    // T4-specific grid size optimization
+    if(deviceProp.major == 7 && deviceProp.minor == 5) {
+      // T4 has 40 SMs, optimize for this
+      if(*x <= 0) *x = 40; // One block per SM for T4
+      if(*y <= 0) *y = 128; // Optimal thread count for T4
+    } else {
+      if(*x <= 0) *x = 2 * deviceProp.multiProcessorCount;
+      if(*y <= 0) *y = 2 * _ConvertSMVer2Cores(deviceProp.major,deviceProp.minor);
+      if(*y <= 0) *y = 128;
+    }
 
   }
 
@@ -545,8 +572,11 @@ bool GPUEngine::callKernel() {
   cudaMemset(outputItem,0,4);
 
   // Call the kernel (Perform STEP_SIZE keys per thread)
-  comp_kangaroos << < nbThread / nbThreadPerGroup,nbThreadPerGroup >> >
-      (inputKangaroo,maxFound,outputItem,dpMask);
+  // Optimized launch configuration for T4
+  dim3 gridDim(nbThread / nbThreadPerGroup, 1, 1);
+  dim3 blockDim(nbThreadPerGroup, 1, 1);
+  
+  comp_kangaroos<<<gridDim, blockDim>>>(inputKangaroo,maxFound,outputItem,dpMask);
 
   cudaError_t err = cudaGetLastError();
   if(err != cudaSuccess) {

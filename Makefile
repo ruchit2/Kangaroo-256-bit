@@ -11,7 +11,7 @@ OBJDIR = obj
 OBJET = $(addprefix $(OBJDIR)/, \
       SECPK1/IntGroup.o main.o SECPK1/Random.o \
       Timer.o SECPK1/Int.o SECPK1/IntMod.o \
-      SECPK1/Point.o SECPK1/SECP256K1.o \
+      Point.o SECPK1/SECP256K1.o \
       GPU/GPUEngine.o Kangaroo.o HashTable.o Thread.o \
       Backup.o Check.o Network.o Merge.o PartMerge.o)
 
@@ -59,7 +59,8 @@ ifdef gpu
 ifdef debug
 CXXFLAGS   = -DWITHGPU -m64 -mssse3 -Wno-unused-result -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   = -DWITHGPU -m64 -mssse3 -Wno-unused-result -Wno-write-strings -O2 -I. -I$(CUDA)/include
+# Optimized flags for modern CPUs
+CXXFLAGS   = -DWITHGPU -m64 -march=native -mtune=native -mssse3 -Wno-unused-result -Wno-write-strings -O3 -flto -funroll-loops -finline-functions -ftree-vectorize -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
 
@@ -86,10 +87,17 @@ endif
 ifdef gpu
 ifdef debug
 $(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
-	$(NVCC) -G -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -g -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
+	$(NVCC) -G -maxrregcount=32 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -g -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
 else
+# Optimized compilation for T4 GPUs with CUDA 12.5
 $(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
-	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O2 -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
+	$(NVCC) -maxrregcount=32 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O3 -I$(CUDA)/include \
+		-gencode=arch=compute_$(ccap),code=sm_$(ccap) \
+		--use_fast_math \
+		--extra-device-vectorization \
+		--restrict \
+		--default-stream=per-thread \
+		-o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
 endif
 endif
 

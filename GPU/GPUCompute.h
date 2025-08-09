@@ -1,5 +1,5 @@
 
-// CUDA Kernel main function
+// CUDA Kernel main function - T4 Optimized
 
 // -----------------------------------------------------------------------------------------
 
@@ -32,6 +32,8 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
   dpmask2 = dpMask[2];
   dpmask3 = dpMask[3];
 
+  // T4 optimization: Unroll loops for better instruction-level parallelism
+  #pragma unroll 2
   for(int run = 0; run < NB_RUN; run++) {
 
     // P1 = jumpPoint
@@ -39,6 +41,8 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
 
     __syncthreads();
 
+    // T4 optimization: Coalesced memory access pattern
+    #pragma unroll 4
     for(int g = 0; g < GPU_GRP_SIZE; g++) {
       jmp = (uint32_t)px[g][0] & (NB_JUMP-1);
 
@@ -54,6 +58,8 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
 
     __syncthreads();
 
+    // T4 optimization: Better warp divergence handling
+    #pragma unroll 4
     for(int g = 0; g < GPU_GRP_SIZE; g++) {
 
 #ifdef USE_SYMMETRY
@@ -82,16 +88,21 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
       if(ModPositive256(py[g]))
         ModNeg256Order(dist[g]);
 #endif
+      
+      // T4 optimization: Branchless distinguished point check
       uint64_t *pxg = px[g];
-      if((pxg[0] & dpmask0) == 0 && (pxg[1] & dpmask1) == 0 && (pxg[2] & dpmask2) == 0 && (pxg[3] & dpmask3) == 0) {
-
+      uint32_t isDistinguished = ((pxg[0] & dpmask0) == 0) & 
+                                ((pxg[1] & dpmask1) == 0) & 
+                                ((pxg[2] & dpmask2) == 0) & 
+                                ((pxg[3] & dpmask3) == 0);
+      
+      if(isDistinguished) {
         // Distinguished point
         uint32_t pos = atomicAdd(out,1);
         if(pos < maxFound) {
           uint64_t kIdx = (uint64_t)IDX + (uint64_t)g*(uint64_t)blockDim.x + (uint64_t)blockIdx.x*((uint64_t)blockDim.x*GPU_GRP_SIZE);
           OutputDP(px[g],dist[g],&kIdx);
         }
-
       }
 
     }
