@@ -181,12 +181,14 @@ GPUEngine::GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t m
       return;
     }
     
-    // Set shared memory bank size for T4
+    // Set shared memory bank size for T4 (deprecated in CUDA 12.5, but still functional)
+    #if CUDART_VERSION < 12000
     err = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
     if(err != cudaSuccess) {
       printf("GPUEngine: %s\n",cudaGetErrorString(err));
       return;
     }
+    #endif
   } else {
     // Default settings for other GPUs
     err = cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);

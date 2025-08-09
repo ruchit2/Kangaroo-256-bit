@@ -21,6 +21,8 @@ fi
 echo ""
 echo "=== GPU Detection ==="
 nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader,nounits | while IFS=, read -r name compute_cap; do
+    # Trim whitespace from compute_cap
+    compute_cap=$(echo "$compute_cap" | xargs)
     if [[ $compute_cap == "7.5" ]]; then
         echo "✓ Found T4 GPU: $name (Compute Capability: $compute_cap)"
     else
