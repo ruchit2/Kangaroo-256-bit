@@ -531,7 +531,10 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
   while (!endOfSearch) {
     gpu->Launch(gpuFound);
-    counters[thId] += ph->nbKangaroo * NB_RUN;
+    uint64_t gpuCount = getGPUCount();
+    uint64_t count = getCPUCount() + gpuCount;
+    counters[thId] += count - lastSent;
+    lastSent = count;
 
     if (clientMode) {
       for (int i = 0; i < (int)gpuFound.size(); i++) dps.push_back(gpuFound[i]);

@@ -249,6 +249,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
   while(!hasStarted(params))
     Timer::SleepMillis(5);
 
+  memset(counters, 0, sizeof(counters));  // Reset BEFORE timing starts
   t0 = Timer::get_tick();
   startTime = t0;
   lastGPUCount = getGPUCount();
