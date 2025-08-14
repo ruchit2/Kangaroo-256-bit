@@ -5,6 +5,8 @@
 #include <string>
 #ifdef WIN64
 #include <windows.h>
+#else
+#include <sys/time.h>  // Add this include for struct timeval
 #endif
 
 class Timer {
@@ -26,7 +28,7 @@ public:
   static double perfTicksPerSec;
   static LARGE_INTEGER qwTicksPerSec;
 #else
-  static time_t tickStart;
+  static struct timeval tickStart;  // Changed from time_t to struct timeval
 #endif
 
 };

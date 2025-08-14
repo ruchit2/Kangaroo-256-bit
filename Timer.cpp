@@ -14,7 +14,7 @@ LARGE_INTEGER Timer::qwTicksPerSec;
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
-time_t Timer::tickStart;
+struct timeval Timer::tickStart;  // Changed from time_t to struct timeval
 
 #endif
 
@@ -25,7 +25,7 @@ void Timer::Init() {
   QueryPerformanceCounter(&perfTickStart);
   perfTicksPerSec = (double)qwTicksPerSec.QuadPart;
 #else
-  tickStart=time(NULL);
+  gettimeofday(&tickStart, NULL);  // Store full timestamp including microseconds
 #endif
 
 }
@@ -40,7 +40,8 @@ double Timer::get_tick() {
 #else
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (double)(tv.tv_sec - tickStart) + (double)tv.tv_usec / 1e6;
+    // Properly calculate elapsed time: (current_sec - start_sec) + (current_usec - start_usec) / 1e6
+    return (double)(tv.tv_sec - tickStart.tv_sec) + (double)(tv.tv_usec - tickStart.tv_usec) / 1e6;
 #endif
 
 }
